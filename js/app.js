@@ -335,10 +335,170 @@ class AlbionLootTracker {
     }
 
     /**
-     * Edit kill loot (to be implemented)
+     * Edit kill loot
      */
     editKillLoot(eventId) {
-        this.uiManager.showToast('Función en desarrollo', 'warning');
+        if (!this.currentActivity) return;
+
+        const kill = this.currentActivity.pendingKills.find(k => k.eventId === eventId);
+        if (!kill) {
+            this.uiManager.showToast('Kill no encontrada', 'error');
+            return;
+        }
+
+        // Show edit loot modal
+        this.uiManager.showEditLootModal(kill);
+        this.uiManager.showModal('editLootModal');
+    }
+
+    /**
+     * Toggle loot item selection
+     */
+    toggleLootItem(index) {
+        if (!window.selectedLootItems) return;
+
+        const itemCard = document.getElementById(`loot-item-${index}`);
+        if (!itemCard) return;
+
+        if (window.selectedLootItems.has(index)) {
+            // Deselect
+            window.selectedLootItems.delete(index);
+            itemCard.classList.remove('selected');
+            itemCard.style.background = 'rgba(239, 68, 68, 0.1)';
+            itemCard.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            itemCard.style.opacity = '0.6';
+
+            const indicator = itemCard.querySelector('.selection-indicator');
+            if (indicator) {
+                indicator.style.background = 'rgba(239, 68, 68, 0.9)';
+                indicator.textContent = '✗';
+            }
+        } else {
+            // Select
+            window.selectedLootItems.add(index);
+            itemCard.classList.add('selected');
+            itemCard.style.background = 'rgba(34, 197, 94, 0.2)';
+            itemCard.style.borderColor = 'rgba(34, 197, 94, 0.6)';
+            itemCard.style.opacity = '1';
+
+            const indicator = itemCard.querySelector('.selection-indicator');
+            if (indicator) {
+                indicator.style.background = 'rgba(34, 197, 94, 0.9)';
+                indicator.textContent = '✓';
+            }
+        }
+
+        // Update summary
+        this.updateLootSummary();
+    }
+
+    /**
+     * Select all loot items
+     */
+    selectAllLoot() {
+        if (!window.currentEditingKill) return;
+
+        const victimInventory = window.currentEditingKill.victimInventory || window.currentEditingKill.lootDetected || [];
+        window.selectedLootItems = new Set(victimInventory.map((_, index) => index));
+
+        // Update all cards
+        victimInventory.forEach((_, index) => {
+            const itemCard = document.getElementById(`loot-item-${index}`);
+            if (itemCard) {
+                itemCard.classList.add('selected');
+                itemCard.style.background = 'rgba(34, 197, 94, 0.2)';
+                itemCard.style.borderColor = 'rgba(34, 197, 94, 0.6)';
+                itemCard.style.opacity = '1';
+
+                const indicator = itemCard.querySelector('.selection-indicator');
+                if (indicator) {
+                    indicator.style.background = 'rgba(34, 197, 94, 0.9)';
+                    indicator.textContent = '✓';
+                }
+            }
+        });
+
+        this.updateLootSummary();
+        this.uiManager.showToast('Todos los items seleccionados', 'success');
+    }
+
+    /**
+     * Deselect all loot items
+     */
+    deselectAllLoot() {
+        if (!window.currentEditingKill) return;
+
+        const victimInventory = window.currentEditingKill.victimInventory || window.currentEditingKill.lootDetected || [];
+        window.selectedLootItems = new Set();
+
+        // Update all cards
+        victimInventory.forEach((_, index) => {
+            const itemCard = document.getElementById(`loot-item-${index}`);
+            if (itemCard) {
+                itemCard.classList.remove('selected');
+                itemCard.style.background = 'rgba(239, 68, 68, 0.1)';
+                itemCard.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                itemCard.style.opacity = '0.6';
+
+                const indicator = itemCard.querySelector('.selection-indicator');
+                if (indicator) {
+                    indicator.style.background = 'rgba(239, 68, 68, 0.9)';
+                    indicator.textContent = '✗';
+                }
+            }
+        });
+
+        this.updateLootSummary();
+        this.uiManager.showToast('Todos los items deseleccionados', 'info');
+    }
+
+    /**
+     * Update loot summary counters
+     */
+    updateLootSummary() {
+        if (!window.currentEditingKill) return;
+
+        const victimInventory = window.currentEditingKill.victimInventory || window.currentEditingKill.lootDetected || [];
+        const totalItems = victimInventory.length;
+        const obtainedItems = window.selectedLootItems.size;
+        const destroyedItems = totalItems - obtainedItems;
+
+        const totalElement = document.getElementById('totalItemsCount');
+        const obtainedElement = document.getElementById('obtainedItemsCount');
+        const destroyedElement = document.getElementById('destroyedItemsCount');
+
+        if (totalElement) totalElement.textContent = totalItems;
+        if (obtainedElement) obtainedElement.textContent = obtainedItems;
+        if (destroyedElement) destroyedElement.textContent = destroyedItems;
+    }
+
+    /**
+     * Confirm edited loot
+     */
+    confirmEditedLoot(eventId) {
+        if (!this.currentActivity || !window.currentEditingKill) return;
+
+        const victimInventory = window.currentEditingKill.victimInventory || window.currentEditingKill.lootDetected || [];
+        const confirmedLoot = [];
+
+        // Get selected items
+        window.selectedLootItems.forEach(index => {
+            if (victimInventory[index]) {
+                confirmedLoot.push(victimInventory[index]);
+            }
+        });
+
+        // Confirm kill with selected loot
+        this.currentActivity.confirmKill(eventId, confirmedLoot);
+        this.saveCurrentActivity();
+        this.updateActivityUI();
+
+        // Clean up
+        window.currentEditingKill = null;
+        window.selectedLootItems = null;
+
+        this.uiManager.closeModal('editLootModal');
+        this.uiManager.showToast(`Kill confirmada con ${confirmedLoot.length} items obtenidos`, 'success');
     }
 
     /**

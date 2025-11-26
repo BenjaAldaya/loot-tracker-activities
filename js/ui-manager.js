@@ -799,6 +799,131 @@ class UIManager {
         `;
     }
 
+    showEditLootModal(kill) {
+        const container = document.getElementById('editLootContent');
+        if (!container) return;
+
+        const timestamp = new Date(kill.timestamp);
+        const victimInventory = kill.victimInventory || kill.lootDetected || [];
+
+        container.innerHTML = `
+            <div style="margin-bottom: 24px;">
+                <!-- Kill Info -->
+                <div style="background: rgba(233, 69, 96, 0.1); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">
+                        ${kill.killer.name} <span style="color: var(--accent-primary);">→</span> ${kill.victim.name}
+                    </div>
+                    <div style="font-size: 14px; color: var(--text-secondary);">
+                        📅 ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div style="background: rgba(59, 130, 246, 0.1); padding: 16px; border-radius: 8px; margin-bottom: 24px; border-left: 4px solid #3b82f6;">
+                    <div style="font-weight: 600; margin-bottom: 8px; color: #3b82f6;">📋 Instrucciones</div>
+                    <div style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+                        <strong>Selecciona los items que realmente obtuviste</strong> (loot que recogiste).
+                        Los items NO seleccionados se marcarán como destruidos automáticamente.
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                    <button class="btn btn-success" onclick="app.selectAllLoot()" style="flex: 1;">
+                        ✓ Seleccionar Todo
+                    </button>
+                    <button class="btn btn-secondary" onclick="app.deselectAllLoot()" style="flex: 1;">
+                        ✗ Deseleccionar Todo
+                    </button>
+                </div>
+
+                <!-- Items Grid -->
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px;">
+                        💰 Inventario de la Víctima (${victimInventory.length} items)
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+                        Haz clic en cada item para seleccionar/deseleccionar
+                    </div>
+                    ${victimInventory.length > 0 ? `
+                        <div id="lootItemsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-height: 500px; overflow-y: auto;">
+                            ${victimInventory.map((item, index) => `
+                                <div id="loot-item-${index}"
+                                     class="loot-item-card selected"
+                                     onclick="app.toggleLootItem(${index})"
+                                     style="position: relative; background: rgba(34, 197, 94, 0.2); border: 2px solid rgba(34, 197, 94, 0.6); border-radius: 8px; padding: 8px; text-align: center; cursor: pointer; transition: all 0.2s;">
+
+                                    <!-- Selection Indicator -->
+                                    <div class="selection-indicator" style="position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(34, 197, 94, 0.9); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; color: white; z-index: 10;">
+                                        ✓
+                                    </div>
+
+                                    <!-- Item Image -->
+                                    <img src="${app.apiService.getItemImageURL(item.type, item.quality, item.count, 80)}"
+                                         alt="${item.type}"
+                                         style="width: 100%; aspect-ratio: 1; object-fit: contain; margin-bottom: 4px;"
+                                         onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><rect fill=%22%23333%22 width=%22100%%22 height=%22100%%22/><text x=%2250%%22 y=%2250%%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22>?</text></svg>'">
+
+                                    <!-- Item Name -->
+                                    <div style="font-size: 10px; color: var(--text-secondary); word-break: break-all; line-height: 1.2; margin-top: 4px;">
+                                        ${item.type.split('_').pop()}
+                                    </div>
+
+                                    <!-- Quality Badge -->
+                                    ${item.quality > 0 ? `
+                                        <div style="position: absolute; top: 32px; left: 4px; background: rgba(255, 215, 0, 0.9); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: 600;">
+                                            ★${item.quality}
+                                        </div>
+                                    ` : ''}
+
+                                    <!-- Count Badge -->
+                                    ${item.count > 1 ? `
+                                        <div style="position: absolute; bottom: 32px; right: 4px; background: rgba(0, 0, 0, 0.9); color: white; font-size: 12px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">
+                                            x${item.count}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">Sin items en inventario</div>'}
+                </div>
+
+                <!-- Summary -->
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="font-weight: 600; margin-bottom: 12px;">📊 Resumen</div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                        <div style="text-align: center; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                            <div style="font-size: 24px; font-weight: 700; color: #3b82f6;" id="totalItemsCount">${victimInventory.length}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Total Items</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                            <div style="font-size: 24px; font-weight: 700; color: #22c55e;" id="obtainedItemsCount">${victimInventory.length}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Items Obtenidos</div>
+                        </div>
+                        <div style="text-align: center; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                            <div style="font-size: 24px; font-weight: 700; color: #ef4444;" id="destroyedItemsCount">0</div>
+                            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Items Destruidos</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="app.closeModal('editLootModal')">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" onclick="app.confirmEditedLoot(${kill.eventId})">
+                        💾 Confirmar Loot
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Store kill data for later use
+        window.currentEditingKill = kill;
+        window.selectedLootItems = new Set(victimInventory.map((_, index) => index));
+    }
+
     populateHistory(history) {
         const container = document.getElementById('historyList');
         if (!container) return;
