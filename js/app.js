@@ -91,6 +91,7 @@ class AlbionLootTracker {
 
         this.uiManager.updateActivityInfo(this.currentActivity);
         this.uiManager.updateParticipantsList(this.currentActivity.participants, this.currentActivity);
+        this.uiManager.updateLootChest(this.currentActivity);
         this.uiManager.updatePendingKills(this.currentActivity.pendingKills);
         this.uiManager.updateConfirmedKills(this.currentActivity.kills);
     }
@@ -962,6 +963,45 @@ class AlbionLootTracker {
      */
     closeModal(modalId) {
         this.uiManager.closeModal(modalId);
+    }
+
+    /**
+     * Show edit chest name modal
+     */
+    showEditChestNameModal() {
+        if (!this.currentActivity) {
+            this.uiManager.showToast('No hay actividad activa', 'warning');
+            return;
+        }
+
+        const chestNameInput = document.getElementById('chestNameInput');
+        if (chestNameInput) {
+            chestNameInput.value = this.currentActivity.lootChest.name;
+        }
+
+        this.uiManager.showModal('editChestNameModal');
+    }
+
+    /**
+     * Confirm chest name change
+     */
+    confirmChestName() {
+        if (!this.currentActivity) return;
+
+        const chestNameInput = document.getElementById('chestNameInput');
+        const newName = chestNameInput.value.trim();
+
+        if (!newName) {
+            this.uiManager.showToast('El nombre del baúl no puede estar vacío', 'warning');
+            return;
+        }
+
+        this.currentActivity.setChestName(newName);
+        this.saveCurrentActivity();
+        this.updateActivityUI();
+
+        this.uiManager.closeModal('editChestNameModal');
+        this.uiManager.showToast(`Baúl renombrado a "${newName}"`, 'success');
     }
 
     /**

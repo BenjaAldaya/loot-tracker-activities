@@ -61,6 +61,13 @@ class Activity {
         this.otherGuildKills = data.otherGuildKills || []; // Kills from guild members not in activity
         this.otherKillsOffset = data.otherKillsOffset || 0; // Pagination offset for loading more kills
         this.otherKillsHasMore = data.otherKillsHasMore !== false; // Whether there are more kills to load
+
+        // Loot Chest System
+        this.lootChest = data.lootChest || {
+            name: data.lootChest?.name || 'Baúl de Botín',
+            items: data.lootChest?.items || [],
+            totalValue: data.lootChest?.totalValue || 0
+        };
     }
 
     addParticipant(name) {
@@ -192,7 +199,49 @@ class Activity {
 
             // Update participant stats
             this.updateParticipantStats(kill);
+
+            // Add confirmed loot to chest
+            this.addLootToChest(confirmedLoot);
         }
+    }
+
+    addLootToChest(items) {
+        if (!items || items.length === 0) return;
+
+        items.forEach(item => {
+            // Check if item already exists in chest (same type, quality, and slot)
+            const existingItem = this.lootChest.items.find(chestItem =>
+                chestItem.type === item.type &&
+                chestItem.quality === item.quality &&
+                chestItem.slot === item.slot
+            );
+
+            if (existingItem) {
+                // If exists, increment count
+                existingItem.count += item.count;
+            } else {
+                // If doesn't exist, add as new item
+                this.lootChest.items.push({
+                    type: item.type,
+                    count: item.count,
+                    quality: item.quality,
+                    slot: item.slot
+                });
+            }
+        });
+    }
+
+    setChestName(name) {
+        this.lootChest.name = name || 'Baúl de Botín';
+    }
+
+    getLootChestSummary() {
+        return {
+            name: this.lootChest.name,
+            totalItems: this.lootChest.items.reduce((sum, item) => sum + item.count, 0),
+            uniqueItems: this.lootChest.items.length,
+            items: this.lootChest.items
+        };
     }
 
     discardKill(eventId) {
@@ -266,7 +315,8 @@ class Activity {
             pendingKills: this.pendingKills,
             otherGuildKills: this.otherGuildKills,
             otherKillsOffset: this.otherKillsOffset,
-            otherKillsHasMore: this.otherKillsHasMore
+            otherKillsHasMore: this.otherKillsHasMore,
+            lootChest: this.lootChest
         };
     }
 }

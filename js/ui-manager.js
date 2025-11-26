@@ -141,6 +141,88 @@ class UIManager {
         this.elements.totalDeaths.textContent = totalDeaths;
     }
 
+    updateLootChest(activity) {
+        const container = document.getElementById('lootChestContainer');
+        if (!container || !activity) return;
+
+        const chestSummary = activity.getLootChestSummary();
+
+        if (chestSummary.totalItems === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📦</div>
+                    <div class="empty-state-text">El baúl está vacío</div>
+                    <div class="empty-state-subtext">Los items confirmados aparecerán aquí</div>
+                </div>
+            `;
+            return;
+        }
+
+        // Sort items by quality (descending) and then by type
+        const sortedItems = [...chestSummary.items].sort((a, b) => {
+            if (b.quality !== a.quality) return b.quality - a.quality;
+            return a.type.localeCompare(b.type);
+        });
+
+        container.innerHTML = `
+            <!-- Chest Header -->
+            <div style="background: rgba(255, 215, 0, 0.1); padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 2px solid rgba(255, 215, 0, 0.3);">
+                <div style="font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #ffd700;">
+                    📦 ${chestSummary.name}
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                    <div style="text-align: center; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                        <div style="font-size: 24px; font-weight: 700; color: #00d9ff;">${chestSummary.totalItems}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Items Totales</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                        <div style="font-size: 24px; font-weight: 700; color: #7bed9f;">${chestSummary.uniqueItems}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Items Únicos</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+                        <div style="font-size: 24px; font-weight: 700; color: #22c55e;">${activity.kills.length}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Kills</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chest Items Grid -->
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 16px; border-radius: 8px;">
+                <div style="font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); font-size: 13px;">
+                    💰 Contenido del Baúl
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; max-height: 400px; overflow-y: auto;">
+                    ${sortedItems.map(item => `
+                        <div style="position: relative; background: rgba(255, 215, 0, 0.05); border: 2px solid rgba(255, 215, 0, 0.2); border-radius: 8px; padding: 8px; text-align: center;">
+                            <!-- Item Image -->
+                            <img src="${app.apiService.getItemImageURL(item.type, item.quality, item.count, 80)}"
+                                 alt="${item.type}"
+                                 style="width: 100%; aspect-ratio: 1; object-fit: contain; margin-bottom: 4px;"
+                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22><rect fill=%22%23333%22 width=%22100%%22 height=%22100%%22/><text x=%2250%%22 y=%2250%%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22>?</text></svg>'">
+
+                            <!-- Item Name -->
+                            <div style="font-size: 10px; color: var(--text-secondary); word-break: break-all; line-height: 1.2; margin-top: 4px;">
+                                ${item.type.split('_').pop()}
+                            </div>
+
+                            <!-- Quality Badge -->
+                            ${item.quality > 0 ? `
+                                <div style="position: absolute; top: 4px; left: 4px; background: rgba(255, 215, 0, 0.9); color: #000; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: 600;">
+                                    ★${item.quality}
+                                </div>
+                            ` : ''}
+
+                            <!-- Count Badge -->
+                            <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0, 217, 255, 0.9); color: white; font-size: 12px; padding: 3px 6px; border-radius: 4px; font-weight: 700; border: 1px solid rgba(0, 217, 255, 0.5);">
+                                x${item.count}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
     updateParticipantsList(participants, activity) {
         this.elements.participantCount.textContent = participants.length;
 
