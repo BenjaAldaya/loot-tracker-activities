@@ -10,6 +10,7 @@ class AlbionLootTracker {
 
         // Initialize services and managers
         this.apiService = new AlbionAPIService();
+        this.priceService = new AlbionPriceService();
         this.uiManager = new UIManager();
 
         // Bind methods
@@ -312,15 +313,69 @@ class AlbionLootTracker {
     /**
      * Confirm a kill with all detected loot
      */
-    confirmKill(eventId) {
+    async confirmKill(eventId) {
         if (!this.currentActivity) return;
 
         const kill = this.currentActivity.pendingKills.find(k => k.eventId === eventId);
-        if (kill) {
-            this.currentActivity.confirmKill(eventId, kill.lootDetected);
+        if (!kill) return;
+
+        const loot = kill.victimInventory || kill.lootDetected || [];
+
+        if (loot.length === 0) {
+            this.currentActivity.confirmKill(eventId, loot);
             this.saveCurrentActivity();
             this.updateActivityUI();
-            this.uiManager.showToast('Kill confirmada', 'success');
+            this.uiManager.showToast('Kill confirmada sin loot', 'info');
+            return;
+        }
+
+        this.uiManager.showToast('Consultando precios...', 'info');
+
+        try {
+            const priceMap = await this.priceService.getItemsPrices(loot, this.currentActivity.city);
+
+            loot.forEach(item => {
+                const key = `${item.type}_${item.quality || 0}`;
+                const priceInfo = priceMap.get(key);
+
+                if (priceInfo && priceInfo.found) {
+                    item.price = {
+                        sellPrice: priceInfo.sellPrice,
+                        buyPrice: priceInfo.buyPrice,
+                        city: priceInfo.city,
+                        lastUpdate: priceInfo.lastUpdate,
+                        found: true
+                    };
+                } else {
+                    item.price = {
+                        sellPrice: 0,
+                        buyPrice: 0,
+                        city: this.currentActivity.city,
+                        lastUpdate: new Date().toISOString(),
+                        found: false
+                    };
+                }
+            });
+
+            this.currentActivity.confirmKill(eventId, loot);
+            this.saveCurrentActivity();
+            this.updateActivityUI();
+
+            const totalValue = this.priceService.calculateTotalValue(loot);
+            const formattedValue = this.priceService.formatPrice(totalValue);
+            const itemsWithPrice = loot.filter(item => item.price?.found).length;
+
+            this.uiManager.showToast(
+                `Kill confirmada: ${loot.length} items (${itemsWithPrice} con precio) - Valor: ${formattedValue}`,
+                'success'
+            );
+        } catch (error) {
+            console.error('Error fetching prices:', error);
+
+            this.currentActivity.confirmKill(eventId, loot);
+            this.saveCurrentActivity();
+            this.updateActivityUI();
+            this.uiManager.showToast('Kill confirmada (error al obtener precios)', 'warning');
         }
     }
 
@@ -479,7 +534,7 @@ class AlbionLootTracker {
     /**
      * Confirm edited loot
      */
-    confirmEditedLoot(eventId) {
+    async confirmEditedLoot(eventId) {
         if (!this.currentActivity || !window.currentEditingKill) return;
 
         const victimInventory = window.currentEditingKill.victimInventory || window.currentEditingKill.lootDetected || [];
@@ -492,17 +547,83 @@ class AlbionLootTracker {
             }
         });
 
-        // Confirm kill with selected loot
-        this.currentActivity.confirmKill(eventId, confirmedLoot);
-        this.saveCurrentActivity();
-        this.updateActivityUI();
+        if (confirmedLoot.length === 0) {
+            // Confirm kill with empty loot
+            this.currentActivity.confirmKill(eventId, confirmedLoot);
+            this.saveCurrentActivity();
+            this.updateActivityUI();
 
-        // Clean up
-        window.currentEditingKill = null;
-        window.selectedLootItems = null;
+            window.currentEditingKill = null;
+            window.selectedLootItems = null;
+            this.uiManager.closeModal('editLootModal');
+            this.uiManager.showToast('Kill confirmada sin loot obtenido', 'info');
+            return;
+        }
 
-        this.uiManager.closeModal('editLootModal');
-        this.uiManager.showToast(`Kill confirmada con ${confirmedLoot.length} items obtenidos`, 'success');
+        // Show loading toast
+        this.uiManager.showToast('Consultando precios...', 'info');
+
+        try {
+            // Fetch prices for confirmed loot
+            const priceMap = await this.priceService.getItemsPrices(confirmedLoot, this.currentActivity.city);
+
+            // Attach prices to items
+            confirmedLoot.forEach(item => {
+                const key = `${item.type}_${item.quality || 0}`;
+                const priceInfo = priceMap.get(key);
+
+                if (priceInfo && priceInfo.found) {
+                    item.price = {
+                        sellPrice: priceInfo.sellPrice,
+                        buyPrice: priceInfo.buyPrice,
+                        city: priceInfo.city,
+                        lastUpdate: priceInfo.lastUpdate,
+                        found: true
+                    };
+                } else {
+                    item.price = {
+                        sellPrice: 0,
+                        buyPrice: 0,
+                        city: this.currentActivity.city,
+                        lastUpdate: new Date().toISOString(),
+                        found: false
+                    };
+                }
+            });
+
+            // Confirm kill with priced loot
+            this.currentActivity.confirmKill(eventId, confirmedLoot);
+            this.saveCurrentActivity();
+            this.updateActivityUI();
+
+            // Clean up
+            window.currentEditingKill = null;
+            window.selectedLootItems = null;
+
+            this.uiManager.closeModal('editLootModal');
+
+            const totalValue = this.priceService.calculateTotalValue(confirmedLoot);
+            const formattedValue = this.priceService.formatPrice(totalValue);
+            const itemsWithPrice = confirmedLoot.filter(item => item.price?.found).length;
+
+            this.uiManager.showToast(
+                `Kill confirmada: ${confirmedLoot.length} items (${itemsWithPrice} con precio) - Valor: ${formattedValue}`,
+                'success'
+            );
+        } catch (error) {
+            console.error('Error fetching prices:', error);
+
+            // Confirm without prices if API fails
+            this.currentActivity.confirmKill(eventId, confirmedLoot);
+            this.saveCurrentActivity();
+            this.updateActivityUI();
+
+            window.currentEditingKill = null;
+            window.selectedLootItems = null;
+
+            this.uiManager.closeModal('editLootModal');
+            this.uiManager.showToast(`Kill confirmada (error al obtener precios)`, 'warning');
+        }
     }
 
     /**

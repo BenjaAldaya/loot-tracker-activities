@@ -220,18 +220,34 @@ class Activity {
             );
 
             if (existingItem) {
-                // If exists, increment count
+                // If exists, increment count and update price if new price is available
                 existingItem.count += item.count;
+                if (item.price && item.price.found) {
+                    existingItem.price = item.price;
+                }
             } else {
                 // If doesn't exist, add as new item
                 this.lootChest.items.push({
                     type: item.type,
                     count: item.count,
                     quality: item.quality,
-                    slot: item.slot
+                    slot: item.slot,
+                    price: item.price || null
                 });
             }
         });
+
+        // Update total value
+        this.updateChestValue();
+        this.lootChest.lastPriceUpdate = new Date().toISOString();
+    }
+
+    updateChestValue() {
+        this.lootChest.totalValue = this.lootChest.items.reduce((total, item) => {
+            const price = item.price?.sellPrice || 0;
+            const count = item.count || 1;
+            return total + (price * count);
+        }, 0);
     }
 
     setChestName(name) {
