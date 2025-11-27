@@ -19,6 +19,9 @@ class OtherKillsApp {
     async init() {
         console.log('Initializing Other Kills App...');
 
+        // Start UTC clock
+        this.startUTCClock();
+
         // Load configuration
         const savedConfig = StorageManager.load(StorageManager.KEYS.CONFIG);
         if (!savedConfig) {
@@ -45,6 +48,24 @@ class OtherKillsApp {
         console.log('Other Kills App initialized');
     }
 
+    startUTCClock() {
+        const updateClock = () => {
+            const now = new Date();
+            const hours = String(now.getUTCHours()).padStart(2, '0');
+            const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(now.getUTCSeconds()).padStart(2, '0');
+            const timeString = `${hours}:${minutes}:${seconds} UTC`;
+
+            const timeElement = document.getElementById('utcTime');
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+        };
+
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
     async loadOtherGuildKills() {
         if (this.isLoading) return;
         this.isLoading = true;
@@ -61,16 +82,20 @@ class OtherKillsApp {
 
             console.log(`Received ${guildEvents.length} guild events`);
 
-            // Get active participant names
+            // Get active participant names and activity start time
             const activeParticipantNames = this.currentActivity
                 ? this.currentActivity.participants.map(p => p.name)
                 : [];
+            const activityStartTime = this.currentActivity
+                ? this.currentActivity.startTime
+                : null;
 
             // Filter kills from non-activity members
             const otherKills = this.apiService.filterOtherGuildKills(
                 guildEvents,
                 this.config.members,
-                activeParticipantNames
+                activeParticipantNames,
+                activityStartTime
             );
 
             console.log(`Filtered to ${otherKills.length} other guild kills`);
@@ -255,13 +280,15 @@ class OtherKillsApp {
     }
 
     startPolling() {
-        // Poll every 30 seconds
+        // Poll every 3 minutes - users don't need real-time updates for historical guild kills
         this.pollInterval = setInterval(async () => {
-            console.log('Polling for new kills...');
+            console.log('Polling for new guild kills...');
             this.offset = 0;
             this.hasMore = true;
             await this.loadOtherGuildKills();
-        }, 30000);
+        }, 180000); // 3 minutes (180 seconds)
+
+        console.log('✅ Polling started: checking for new guild kills every 3 minutes');
     }
 
     stopPolling() {

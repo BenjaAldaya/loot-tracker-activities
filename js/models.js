@@ -62,6 +62,7 @@ class Activity {
         this.otherGuildKills = data.otherGuildKills || []; // Kills from guild members not in activity
         this.otherKillsOffset = data.otherKillsOffset || 0; // Pagination offset for loading more kills
         this.otherKillsHasMore = data.otherKillsHasMore !== false; // Whether there are more kills to load
+        this.lastEventId = data.lastEventId || 0; // Track last processed event ID to prevent duplicates
 
         // Loot Chest System
         this.lootChest = data.lootChest || {
@@ -188,7 +189,54 @@ class Activity {
     }
 
     addPendingKill(killData) {
+        // Check for duplicates before adding
+        const isDuplicate = this.pendingKills.some(k => k.eventId === killData.eventId);
+        if (isDuplicate) {
+            console.log(`[DUPLICATE PREVENTION] Skipping duplicate kill eventId: ${killData.eventId}`);
+            return false;
+        }
+
         this.pendingKills.push(killData);
+        return true;
+    }
+
+    /**
+     * Remove duplicate kills and kills from before activity started
+     * @returns {object} Object with duplicatesCount and oldKillsCount
+     */
+    removeDuplicatePendingKills() {
+        const uniqueKills = [];
+        const seen = new Set();
+        let duplicatesCount = 0;
+        let oldKillsCount = 0;
+
+        const activityStartDate = new Date(this.startTime);
+
+        for (const kill of this.pendingKills) {
+            // Check if it's a duplicate
+            if (seen.has(kill.eventId)) {
+                duplicatesCount++;
+                console.log(`[CLEANUP] Removing duplicate kill eventId: ${kill.eventId}`);
+                continue;
+            }
+
+            // Check if kill happened before activity started
+            if (kill.timestamp) {
+                const killDate = new Date(kill.timestamp);
+                if (killDate < activityStartDate) {
+                    oldKillsCount++;
+                    console.log(`[CLEANUP] Removing old kill eventId: ${kill.eventId} (${kill.timestamp} < ${this.startTime})`);
+                    continue;
+                }
+            }
+
+            // Keep this kill
+            seen.add(kill.eventId);
+            uniqueKills.push(kill);
+        }
+
+        this.pendingKills = uniqueKills;
+        return { duplicatesCount, oldKillsCount };
     }
 
     confirmKill(eventId, confirmedLoot) {
@@ -341,6 +389,7 @@ class Activity {
             otherGuildKills: this.otherGuildKills,
             otherKillsOffset: this.otherKillsOffset,
             otherKillsHasMore: this.otherKillsHasMore,
+            lastEventId: this.lastEventId,
             lootChest: this.lootChest
         };
     }

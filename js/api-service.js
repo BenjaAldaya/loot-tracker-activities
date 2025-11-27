@@ -13,6 +13,10 @@ class AlbionAPIService {
         this.renderURL = 'https://render.albiononline.com/v1/item';
         this.lastEventId = 0;
         this.timeout = 15000; // 15 seconds timeout
+
+        // Rate limiting for Events API
+        this.lastEventsRequestTime = 0;
+        this.minEventsRequestInterval = 1000; // Minimum 1 second between Events API calls
     }
 
     /**
@@ -106,6 +110,9 @@ class AlbionAPIService {
      * @returns {Promise<Array>} Array of kill events
      */
     async fetchEvents(limit = 51, offset = 0) {
+        // Rate limiting: wait if necessary
+        await this.waitForEventsRateLimit();
+
         try {
             const apiUrl = `${this.baseURL}/events?limit=${limit}&offset=${offset}`;
             const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
@@ -122,6 +129,22 @@ class AlbionAPIService {
             console.error('Error fetching events:', error);
             throw error;
         }
+    }
+
+    /**
+     * Wait for rate limit if necessary (Events API)
+     */
+    async waitForEventsRateLimit() {
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastEventsRequestTime;
+
+        if (timeSinceLastRequest < this.minEventsRequestInterval) {
+            const waitTime = this.minEventsRequestInterval - timeSinceLastRequest;
+            console.log(`[RATE LIMIT] Waiting ${waitTime}ms before Events API call`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+
+        this.lastEventsRequestTime = Date.now();
     }
 
     /**
@@ -177,6 +200,9 @@ class AlbionAPIService {
      * @returns {Promise<Array>} Array of guild kill events
      */
     async fetchGuildEvents(guildId, limit = 51, offset = 0) {
+        // Rate limiting: wait if necessary
+        await this.waitForEventsRateLimit();
+
         try {
             const apiUrl = `${this.baseURL}/events?limit=${limit}&offset=${offset}&guildId=${guildId}`;
             const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
@@ -231,19 +257,49 @@ class AlbionAPIService {
      * @param {Array} events - All events from API
      * @param {Array} participantNames - Array of participant names in the activity
      * @param {boolean} includeAll - If true, include all kills regardless of lastEventId (for initial load)
+     * @param {string} guildName - Optional guild name filter
+     * @param {string} activityStartTime - ISO timestamp of activity start (to filter out kills before activity)
      * @returns {Array} Filtered kill events
      */
-    filterActivityKills(events, participantNames, includeAll = false) {
+    filterActivityKills(events, participantNames, includeAll = false, guildName = null, activityStartTime = null) {
         if (!participantNames || participantNames.length === 0) {
-            console.warn('No participants provided for filtering');
+            console.warn('⚠️ No participants provided for filtering');
             return [];
         }
 
-        console.log('Filtering kills for participants:', participantNames, includeAll ? '(INITIAL LOAD - ALL KILLS)' : '(new kills only)');
+        console.log('🔍 Filtering kills for participants:', participantNames, includeAll ? '(INITIAL LOAD - ALL KILLS)' : '(new kills only)');
+        console.log(`   Looking for ${participantNames.length} participants in ${events.length} events`);
+        if (guildName) {
+            console.log(`   Also filtering by guild name: "${guildName}"`);
+        }
+        if (activityStartTime) {
+            console.log(`   Also filtering by activity start time: ${activityStartTime}`);
+        }
 
-        return events.filter(event => {
+        let skippedByEventId = 0;
+        let skippedNoParticipation = 0;
+        let skippedWrongGuild = 0;
+        let skippedBeforeActivity = 0;
+        let included = 0;
+        let guildKillsFound = {};
+
+        const activityStartDate = activityStartTime ? new Date(activityStartTime) : null;
+
+        const filtered = events.filter(event => {
             // Skip already processed events (unless this is initial load)
-            if (!includeAll && event.EventId <= this.lastEventId) return false;
+            if (!includeAll && event.EventId <= this.lastEventId) {
+                skippedByEventId++;
+                return false;
+            }
+
+            // Skip kills that happened before activity started
+            if (activityStartDate && event.TimeStamp) {
+                const eventDate = new Date(event.TimeStamp);
+                if (eventDate < activityStartDate) {
+                    skippedBeforeActivity++;
+                    return false;
+                }
+            }
 
             // Check if killer is one of the activity participants
             const killerIsParticipant = event.Killer && participantNames.includes(event.Killer.Name);
@@ -253,8 +309,88 @@ class AlbionAPIService {
                 participantNames.includes(p.Name)
             );
 
-            return killerIsParticipant || hasActivityParticipant;
+            // NEW: Check if killer or any participant is from the specified guild
+            let guildMatch = false;
+            if (guildName) {
+                const killerInGuild = event.Killer && event.Killer.GuildName === guildName;
+                const participantInGuild = event.Participants && event.Participants.some(p =>
+                    p.GuildName === guildName
+                );
+                guildMatch = killerInGuild || participantInGuild;
+            }
+
+            // Include if:
+            // 1. Participant name matches AND (no guild filter OR guild matches)
+            // 2. OR just guild matches (if guild name provided)
+            let shouldInclude;
+            if (guildName) {
+                // If guild filter is active, require BOTH participant in activity AND guild match
+                shouldInclude = (killerIsParticipant || hasActivityParticipant) && guildMatch;
+                if (!guildMatch && (killerIsParticipant || hasActivityParticipant)) {
+                    skippedWrongGuild++;
+                }
+            } else {
+                // No guild filter, just use participant matching
+                shouldInclude = killerIsParticipant || hasActivityParticipant;
+            }
+
+            // Track guilds for debugging
+            const killerGuild = event.Killer?.GuildName || 'No Guild';
+            if (killerGuild !== 'No Guild') {
+                guildKillsFound[killerGuild] = (guildKillsFound[killerGuild] || 0) + 1;
+            }
+
+            if (shouldInclude) {
+                included++;
+                const guildMatchStr = guildName ? `, Guild match: ${guildMatch}` : '';
+                console.log(`  ✅ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (Killer in activity: ${killerIsParticipant}, Participant in activity: ${hasActivityParticipant}${guildMatchStr})`);
+            } else {
+                skippedNoParticipation++;
+                const reason = guildName && !guildMatch ? 'Wrong guild' : 'No activity participation';
+                console.log(`  ❌ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (${reason})`);
+            }
+
+            return shouldInclude;
         });
+
+        console.log(`📊 Filter results: ${included} included, ${skippedByEventId} skipped (old EventId), ${skippedNoParticipation} skipped (no participation)${guildName ? `, ${skippedWrongGuild} skipped (wrong guild)` : ''}${activityStartTime ? `, ${skippedBeforeActivity} skipped (before activity)` : ''}`);
+
+        if (Object.keys(guildKillsFound).length > 0) {
+            console.log('📊 Guilds found in events:');
+            Object.entries(guildKillsFound)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([guild, count]) => {
+                    console.log(`   - ${guild}: ${count} kills`);
+                });
+        }
+
+        // Check for potential name mismatches
+        if (included === 0 && events.length > 0) {
+            const allKillerNames = events.map(e => e.Killer?.Name).filter(Boolean);
+            const allParticipantNames = events.flatMap(e => e.Participants?.map(p => p.Name) || []);
+            const allNames = [...new Set([...allKillerNames, ...allParticipantNames])];
+
+            const potentialMatches = [];
+            participantNames.forEach(targetName => {
+                const lowerTarget = targetName.toLowerCase();
+                allNames.forEach(eventName => {
+                    const lowerEvent = eventName.toLowerCase();
+                    // Check for partial matches or similar names
+                    if (lowerEvent.includes(lowerTarget) || lowerTarget.includes(lowerEvent)) {
+                        if (lowerEvent !== lowerTarget) {
+                            potentialMatches.push(`"${targetName}" vs "${eventName}"`);
+                        }
+                    }
+                });
+            });
+
+            if (potentialMatches.length > 0) {
+                console.warn('⚠️ Possible name mismatches detected:');
+                potentialMatches.forEach(match => console.warn(`   - ${match}`));
+            }
+        }
+
+        return filtered;
     }
 
     /**
@@ -271,18 +407,30 @@ class AlbionAPIService {
     }
 
     /**
-     * Filter ALL kills from guild members (regardless of activity or date)
+     * Filter guild kills that are NOT from the current activity
+     * Shows kills from guild members who are NOT in the current activity
      * @param {Array} events - All events from API
-     * @param {Array} allGuildMembers - All guild members
-     * @param {Array} activityParticipantNames - Names of participants in current activity (to exclude)
-     * @returns {Array} Filtered kill events from guild members not in activity
+     * @param {Array} allGuildMembers - All guild members (array of {name, id, ...})
+     * @param {Array} activityParticipantNames - Names of participants in current activity
+     * @param {string} activityStartTime - ISO timestamp of activity start (to exclude activity kills)
+     * @returns {Array} Filtered kill events
      */
-    filterOtherGuildKills(events, allGuildMembers, activityParticipantNames = []) {
+    filterOtherGuildKills(events, allGuildMembers, activityParticipantNames = [], activityStartTime = null) {
         const allMemberNames = allGuildMembers.map(m => m.name);
+        const activityStartDate = activityStartTime ? new Date(activityStartTime) : null;
 
-        console.log('Filtering ALL guild kills (excluding activity participants)...');
+        console.log('🔍 Filtering OTHER guild kills (excluding activity participants)...');
+        console.log(`   Guild members: ${allMemberNames.length}, Activity participants: ${activityParticipantNames.length}`);
+        if (activityStartTime) {
+            console.log(`   Activity start time: ${activityStartTime}`);
+        }
 
-        return events.filter(event => {
+        let included = 0;
+        let skippedNotGuild = 0;
+        let skippedInActivity = 0;
+        let skippedDuringActivity = 0;
+
+        const filtered = events.filter(event => {
             // Check if killer is a guild member
             const killerIsGuildMember = event.Killer && allMemberNames.includes(event.Killer.Name);
 
@@ -293,25 +441,47 @@ class AlbionAPIService {
 
             // Must have guild involvement
             if (!killerIsGuildMember && !hasGuildParticipant) {
+                skippedNotGuild++;
                 return false;
+            }
+
+            // If activity is running, exclude kills that happened AFTER activity started
+            // (those should be in the activity tracker, not here)
+            if (activityStartDate && event.TimeStamp) {
+                const eventDate = new Date(event.TimeStamp);
+                if (eventDate >= activityStartDate) {
+                    skippedDuringActivity++;
+                    return false;
+                }
             }
 
             // If no activity participants provided, include all guild kills
             if (activityParticipantNames.length === 0) {
+                included++;
                 return true;
             }
 
             // Exclude kills where killer is in the activity
             const killerInActivity = event.Killer && activityParticipantNames.includes(event.Killer.Name);
 
-            // Exclude kills where all participants are in the activity
-            const allParticipantsInActivity = event.Participants && event.Participants.every(p =>
+            // Exclude kills where any participant is in the activity
+            const hasActivityParticipant = event.Participants && event.Participants.some(p =>
                 activityParticipantNames.includes(p.Name)
             );
 
-            // Include if killer is NOT in activity OR if there are participants not in activity
-            return !killerInActivity || !allParticipantsInActivity;
+            // Include only if NO activity participants involved
+            if (killerInActivity || hasActivityParticipant) {
+                skippedInActivity++;
+                return false;
+            }
+
+            included++;
+            return true;
         });
+
+        console.log(`📊 Other kills filter results: ${included} included, ${skippedNotGuild} skipped (not guild), ${skippedInActivity} skipped (in activity), ${skippedDuringActivity} skipped (during activity time)`);
+
+        return filtered;
     }
 
     /**
