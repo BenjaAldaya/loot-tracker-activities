@@ -49,14 +49,12 @@ class AlbionLootTracker {
             // Clean up any duplicate kills and old kills from previous activities
             const cleanupResult = this.currentActivity.removeDuplicatePendingKills();
             if (cleanupResult.duplicatesCount > 0 || cleanupResult.oldKillsCount > 0) {
-                console.log(`[CLEANUP] Removed ${cleanupResult.duplicatesCount} duplicate kills and ${cleanupResult.oldKillsCount} old kills from previous activities`);
                 this.saveCurrentActivity();
             }
 
             // Restore lastEventId from saved activity to prevent duplicate kills
             if (this.currentActivity.lastEventId) {
                 this.apiService.lastEventId = this.currentActivity.lastEventId;
-                console.log(`[INIT] Restored lastEventId: ${this.apiService.lastEventId}`);
             }
 
             if (this.currentActivity.status === 'active') {
@@ -247,10 +245,8 @@ class AlbionLootTracker {
         // Only load all historical kills for NEW activities
         // For resumed activities (after page reload), continue from lastEventId
         if (isNewActivity) {
-            console.log('🆕 New activity: loading all historical kills');
             this.checkForKills(true);
         } else {
-            console.log('📂 Resuming activity: continuing from lastEventId');
             this.checkForKills(false);
         }
 
@@ -258,8 +254,6 @@ class AlbionLootTracker {
         this.pollingInterval = setInterval(() => {
             this.checkForKills(false); // Subsequent checks only get new kills
         }, 180000); // Every 3 minutes (180 seconds)
-
-        console.log('✅ Polling started: checking for new kills every 3 minutes');
     }
 
     /**
@@ -302,7 +296,7 @@ class AlbionLootTracker {
     async checkForKills(includeAll = false) {
         // Prevent race condition: don't process if no activity or activity is not active
         if (!this.config || !this.currentActivity || this.currentActivity.status !== 'active') {
-            console.log('[RACE PROTECTION] Skipping kill check - activity not active');
+//             console.log('[RACE PROTECTION] Skipping kill check - activity not active');
             return;
         }
 
@@ -315,8 +309,6 @@ class AlbionLootTracker {
             let allEvents = [];
 
             if (this.config.guildId) {
-                console.log(`[DEBUG] Fetching guild events for: ${this.config.guildName} (ID: ${this.config.guildId})`);
-
                 // Fetch first page
                 events = await this.apiService.fetchGuildEvents(this.config.guildId, 51, 0);
                 allEvents = [...events];
@@ -328,8 +320,6 @@ class AlbionLootTracker {
 
                     // If there's a gap of more than 51 events, try to fetch more pages
                     if (potentialGap > 51 && potentialGap < 1000) {
-                        console.log(`[DEBUG] Potential gap detected (${potentialGap} events), fetching additional pages...`);
-
                         // Fetch up to 10 additional pages (51 * 10 = 510 events max)
                         let offset = 51;
                         let pagesLoaded = 1;
@@ -346,34 +336,21 @@ class AlbionLootTracker {
                             // Check if we've covered the gap
                             const oldestEventId = Math.min(...nextPage.map(e => e.EventId));
                             if (oldestEventId <= this.apiService.lastEventId) {
-                                console.log(`[DEBUG] Gap covered after ${pagesLoaded} pages`);
                                 break;
                             }
                         }
-
-                        console.log(`[DEBUG] Loaded ${pagesLoaded} pages (${allEvents.length} total events)`);
                     }
                 }
 
                 events = allEvents;
             } else {
-                console.log(`[DEBUG] No guild ID configured, fetching general events`);
                 events = await this.apiService.fetchEvents();
             }
-
-            console.log(`[DEBUG] Fetched ${events.length} total events from API`);
-            console.log(`[DEBUG] Current lastEventId: ${this.apiService.lastEventId}`);
-            console.log(`[DEBUG] Include all mode: ${includeAll}`);
 
             // Get active participant names (excluding those who left)
             const activeParticipantNames = this.currentActivity.participants
                 .filter(p => !p.leftAt)
                 .map(p => p.name);
-
-            console.log(`[DEBUG] Active participants: ${activeParticipantNames.join(', ')}`);
-            console.log(`[DEBUG] Guild name: ${this.config.guildName}`);
-            console.log(`[DEBUG] Guild ID: ${this.config.guildId}`);
-            console.log(`[DEBUG] Activity start time: ${this.currentActivity.startTime}`);
 
             // Filter kills only for active participants and after activity start time
             const activityKills = this.apiService.filterActivityKills(
@@ -383,8 +360,6 @@ class AlbionLootTracker {
                 this.config.guildName,  // Pass guild name for additional filtering
                 this.currentActivity.startTime  // Pass activity start time to filter out old kills
             );
-
-            console.log(`[DEBUG] After filtering: ${activityKills.length} activity kills`);
 
             // Check if we might be missing events due to API limit
             if (events.length >= 51 && !includeAll) {
@@ -412,11 +387,11 @@ class AlbionLootTracker {
             }
 
             if (activityKills.length > 0) {
-                console.log(`✅ Found ${activityKills.length} ${includeAll ? 'historical' : 'new'} activity kills`);
+//                 console.log(`✅ Found ${activityKills.length} ${includeAll ? 'historical' : 'new'} activity kills`);
 
                 // Double-check activity is still active before adding kills
                 if (this.currentActivity.status !== 'active') {
-                    console.log('[RACE PROTECTION] Activity ended during processing - discarding kills');
+//                     console.log('[RACE PROTECTION] Activity ended during processing - discarding kills');
                     return;
                 }
 
@@ -433,11 +408,11 @@ class AlbionLootTracker {
                     addedKills++;
                 });
 
-                console.log(`[DEBUG] Added ${addedKills} kills to pending list`);
+//                 console.log(`[DEBUG] Added ${addedKills} kills to pending list`);
 
                 // Update lastEventId with max from activity kills only
                 const maxEventId = Math.max(...activityKills.map(e => e.EventId));
-                console.log(`[DEBUG] Updating lastEventId from ${this.apiService.lastEventId} to ${maxEventId}`);
+//                 console.log(`[DEBUG] Updating lastEventId from ${this.apiService.lastEventId} to ${maxEventId}`);
                 this.apiService.updateLastEventId(maxEventId);
 
                 // Save lastEventId to activity to prevent duplicates on page reload
@@ -446,13 +421,13 @@ class AlbionLootTracker {
                 this.saveCurrentActivity();
                 this.updateActivityUI();
             } else {
-                console.log(`ℹ️ No new kills found in this poll`);
+//                 console.log(`ℹ️ No new kills found in this poll`);
 
                 // Even if no activity kills, update lastEventId to prevent re-checking old events
                 if (events.length > 0) {
                     const maxEventId = Math.max(...events.map(e => e.EventId));
                     if (maxEventId > this.apiService.lastEventId) {
-                        console.log(`[DEBUG] No activity kills but updating lastEventId from ${this.apiService.lastEventId} to ${maxEventId} to skip rechecking`);
+//                         console.log(`[DEBUG] No activity kills but updating lastEventId from ${this.apiService.lastEventId} to ${maxEventId} to skip rechecking`);
                         this.apiService.updateLastEventId(maxEventId);
 
                         // Save lastEventId to activity
@@ -883,184 +858,6 @@ class AlbionLootTracker {
         const history = StorageManager.load(StorageManager.KEYS.HISTORY) || [];
         this.uiManager.populateHistory(history);
         this.uiManager.showModal('historyModal');
-    }
-
-    /**
-     * Show diagnostics panel
-     */
-    showDiagnostics() {
-        this.refreshDiagnostics();
-        this.uiManager.showModal('diagnosticsModal');
-    }
-
-    /**
-     * Refresh diagnostics information
-     */
-    async refreshDiagnostics() {
-        const diagnosticsContent = document.getElementById('diagnosticsContent');
-
-        diagnosticsContent.innerHTML = '<div style="text-align: center; padding: 20px;">Cargando diagnóstico...</div>';
-
-        try {
-            // Fetch current events from API
-            const events = await this.apiService.fetchEvents();
-
-            const now = new Date();
-            const activeParticipantNames = this.currentActivity
-                ? this.currentActivity.participants.filter(p => !p.leftAt).map(p => p.name)
-                : [];
-
-            let html = `
-                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; margin-bottom: 16px;">
-                    <h3 style="margin: 0 0 16px 0; color: #00d9ff;">📊 Estado del Sistema</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div>
-                            <strong>Hora actual:</strong> ${now.toLocaleString('es-ES')}
-                        </div>
-                        <div>
-                            <strong>Actividad activa:</strong> ${this.currentActivity ? '✅ Sí' : '❌ No'}
-                        </div>
-                        <div>
-                            <strong>Último EventId procesado:</strong> ${this.apiService.lastEventId}
-                        </div>
-                        <div>
-                            <strong>Eventos en API:</strong> ${events.length}
-                        </div>
-                        ${this.currentActivity ? `
-                            <div>
-                                <strong>Participantes activos:</strong> ${activeParticipantNames.length}
-                            </div>
-                            <div>
-                                <strong>Kills pendientes:</strong> ${this.currentActivity.pendingKills.length}
-                            </div>
-                            <div>
-                                <strong>Kills confirmadas:</strong> ${this.currentActivity.kills.length}
-                            </div>
-                            <div>
-                                <strong>Ciudad:</strong> ${this.currentActivity.city}
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-
-            if (this.currentActivity) {
-                html += `
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; margin-bottom: 16px;">
-                        <h3 style="margin: 0 0 16px 0; color: #00d9ff;">👥 Participantes Activos</h3>
-                        <div style="background: rgba(0, 0, 0, 0.3); padding: 12px; border-radius: 4px; overflow-x: auto;">
-                            ${activeParticipantNames.map(name => `<span style="display: inline-block; background: rgba(34, 197, 94, 0.2); padding: 4px 8px; border-radius: 4px; margin: 4px;">${name}</span>`).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (events.length > 0) {
-                const minEventId = Math.min(...events.map(e => e.EventId));
-                const maxEventId = Math.max(...events.map(e => e.EventId));
-                const gap = this.apiService.lastEventId > 0 && minEventId > this.apiService.lastEventId + 1
-                    ? minEventId - this.apiService.lastEventId - 1
-                    : 0;
-
-                html += `
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; margin-bottom: 16px;">
-                        <h3 style="margin: 0 0 16px 0; color: #00d9ff;">🔍 Análisis de Eventos API</h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div>
-                                <strong>EventId más antiguo disponible:</strong> ${minEventId}
-                            </div>
-                            <div>
-                                <strong>EventId más reciente:</strong> ${maxEventId}
-                            </div>
-                            <div>
-                                <strong>Rango de EventIds:</strong> ${maxEventId - minEventId + 1}
-                            </div>
-                            <div>
-                                <strong>Total eventos retornados:</strong> ${events.length}
-                            </div>
-                        </div>
-                        ${gap > 0 ? `
-                            <div style="background: rgba(239, 68, 68, 0.2); padding: 12px; border-radius: 4px; border-left: 4px solid #ef4444;">
-                                <strong>⚠️ ADVERTENCIA:</strong> Hay un hueco de <strong>${gap}</strong> eventos entre el último procesado (${this.apiService.lastEventId}) y el más antiguo disponible (${minEventId}).
-                                <br><strong>Posibles causas:</strong> El polling se detuvo por mucho tiempo, o hubo demasiada actividad y se superó el límite de 51 eventos.
-                            </div>
-                        ` : `
-                            <div style="background: rgba(34, 197, 94, 0.2); padding: 12px; border-radius: 4px; border-left: 4px solid #22c55e;">
-                                <strong>✅ OK:</strong> No se detectaron huecos en los EventIds. Todos los eventos están siendo procesados correctamente.
-                            </div>
-                        `}
-                        ${events.length >= 51 ? `
-                            <div style="background: rgba(245, 158, 11, 0.2); padding: 12px; border-radius: 4px; border-left: 4px solid #f59e0b; margin-top: 12px;">
-                                <strong>⚠️ LÍMITE DE API ALCANZADO:</strong> La API retornó el máximo de 51 eventos por página. El sistema ahora carga múltiples páginas automáticamente si detecta huecos.
-                                <br><strong>Intervalo actual:</strong> Polling cada 15 segundos para maximizar captura de eventos.
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-
-                // Show last 10 events
-                html += `
-                    <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
-                        <h3 style="margin: 0 0 16px 0; color: #00d9ff;">📋 Últimos 10 Eventos de la API</h3>
-                        <div style="background: rgba(0, 0, 0, 0.3); padding: 12px; border-radius: 4px; max-height: 400px; overflow-y: auto;">
-                `;
-
-                const recentEvents = events.slice(0, 10);
-                for (const event of recentEvents) {
-                    const isProcessed = event.EventId <= this.apiService.lastEventId;
-                    const isRelevant = this.currentActivity && activeParticipantNames.length > 0 && (
-                        (event.Killer && activeParticipantNames.includes(event.Killer.Name)) ||
-                        (event.Participants && event.Participants.some(p => activeParticipantNames.includes(p.Name)))
-                    );
-
-                    const statusColor = isProcessed ? '#6b7280' : (isRelevant ? '#22c55e' : '#f59e0b');
-                    const statusText = isProcessed ? 'Ya procesado' : (isRelevant ? 'Relevante' : 'No relevante');
-                    const statusIcon = isProcessed ? '✓' : (isRelevant ? '🎯' : '○');
-
-                    html += `
-                        <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid ${statusColor};">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                <div>
-                                    <strong style="color: #00d9ff;">Event ${event.EventId}</strong>
-                                    <span style="margin-left: 12px; color: ${statusColor};">${statusIcon} ${statusText}</span>
-                                </div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">
-                                    ${new Date(event.TimeStamp).toLocaleString('es-ES')}
-                                </div>
-                            </div>
-                            <div style="font-size: 13px;">
-                                <strong>Killer:</strong> ${event.Killer?.Name || 'Unknown'}
-                                <span style="margin-left: 12px;"><strong>Victim:</strong> ${event.Victim?.Name || 'Unknown'}</span>
-                                <br>
-                                <strong>Participants:</strong> ${event.Participants?.map(p => p.Name).join(', ') || 'None'}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                html += `
-                        </div>
-                    </div>
-                `;
-            } else {
-                html += `
-                    <div style="background: rgba(239, 68, 68, 0.2); padding: 20px; border-radius: 8px; text-align: center;">
-                        <strong>⚠️ No se pudieron obtener eventos de la API</strong>
-                        <br>Verifica tu conexión a internet y que la API de Albion esté disponible.
-                    </div>
-                `;
-            }
-
-            diagnosticsContent.innerHTML = html;
-
-        } catch (error) {
-            diagnosticsContent.innerHTML = `
-                <div style="background: rgba(239, 68, 68, 0.2); padding: 20px; border-radius: 8px;">
-                    <strong>❌ Error al cargar diagnóstico:</strong>
-                    <pre style="margin-top: 12px; padding: 12px; background: rgba(0, 0, 0, 0.3); border-radius: 4px; overflow-x: auto;">${error.message}</pre>
-                </div>
-            `;
-        }
     }
 
     /**

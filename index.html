@@ -44,10 +44,6 @@
                     <button class="btn btn-nav" onclick="app.exportAllData()">💾 Exportar</button>
                     <button class="btn btn-nav" onclick="app.importDataFromJSON()">📂 Importar</button>
                 </div>
-                <div class="nav-group">
-                    <span class="nav-label">Herramientas</span>
-                    <button class="btn btn-nav" onclick="app.showDiagnostics()">🔧 Diagnóstico</button>
-                </div>
             </div>
         </div>
 
@@ -362,21 +358,6 @@
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button class="btn btn-secondary" onclick="app.closeModal('editChestNameModal')">Cancelar</button>
                 <button class="btn btn-primary" onclick="app.confirmChestName()">💾 Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Diagnostics Modal -->
-    <div id="diagnosticsModal" class="modal">
-        <div class="modal-content" style="max-width: 900px;">
-            <div class="modal-header">
-                <div class="modal-title">🔧 Panel de Diagnóstico</div>
-                <button class="close-btn" onclick="app.closeModal('diagnosticsModal')">×</button>
-            </div>
-            <div id="diagnosticsContent" style="font-family: 'Courier New', monospace; font-size: 13px;"></div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px;">
-                <button class="btn btn-primary" onclick="app.refreshDiagnostics()">🔄 Actualizar</button>
-                <button class="btn btn-secondary" onclick="app.closeModal('diagnosticsModal')">Cerrar</button>
             </div>
         </div>
     </div>

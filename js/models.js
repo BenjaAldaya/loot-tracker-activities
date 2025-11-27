@@ -192,7 +192,7 @@ class Activity {
         // Check for duplicates before adding
         const isDuplicate = this.pendingKills.some(k => k.eventId === killData.eventId);
         if (isDuplicate) {
-            console.log(`[DUPLICATE PREVENTION] Skipping duplicate kill eventId: ${killData.eventId}`);
+//             console.log(`[DUPLICATE PREVENTION] Skipping duplicate kill eventId: ${killData.eventId}`);
             return false;
         }
 
@@ -216,7 +216,7 @@ class Activity {
             // Check if it's a duplicate
             if (seen.has(kill.eventId)) {
                 duplicatesCount++;
-                console.log(`[CLEANUP] Removing duplicate kill eventId: ${kill.eventId}`);
+//                 console.log(`[CLEANUP] Removing duplicate kill eventId: ${kill.eventId}`);
                 continue;
             }
 
@@ -225,7 +225,7 @@ class Activity {
                 const killDate = new Date(kill.timestamp);
                 if (killDate < activityStartDate) {
                     oldKillsCount++;
-                    console.log(`[CLEANUP] Removing old kill eventId: ${kill.eventId} (${kill.timestamp} < ${this.startTime})`);
+//                     console.log(`[CLEANUP] Removing old kill eventId: ${kill.eventId} (${kill.timestamp} < ${this.startTime})`);
                     continue;
                 }
             }

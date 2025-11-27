@@ -31,7 +31,7 @@ class AlbionAPIService {
      */
     switchProxy() {
         this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
-        console.log(`Switching to proxy: ${this.proxyURL}`);
+//         console.log(`Switching to proxy: ${this.proxyURL}`);
     }
 
     /**
@@ -66,7 +66,7 @@ class AlbionAPIService {
         for (let i = 0; i < maxRetries; i++) {
             try {
                 const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
-                console.log(`Attempt ${i + 1}/${maxRetries} using proxy: ${this.proxyURL}`);
+//                 console.log(`Attempt ${i + 1}/${maxRetries} using proxy: ${this.proxyURL}`);
 
                 const response = await this.fetchWithTimeout(proxyUrl);
 
@@ -140,7 +140,7 @@ class AlbionAPIService {
 
         if (timeSinceLastRequest < this.minEventsRequestInterval) {
             const waitTime = this.minEventsRequestInterval - timeSinceLastRequest;
-            console.log(`[RATE LIMIT] Waiting ${waitTime}ms before Events API call`);
+//             console.log(`[RATE LIMIT] Waiting ${waitTime}ms before Events API call`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
         }
 
@@ -155,7 +155,7 @@ class AlbionAPIService {
     async searchGuild(guildName) {
         try {
             const apiUrl = `${this.baseURL}/search?q=${encodeURIComponent(guildName)}`;
-            console.log(`Searching for guild: ${guildName}`);
+//             console.log(`Searching for guild: ${guildName}`);
 
             const results = await this.fetchWithRetry(apiUrl, 3);
 
@@ -177,7 +177,7 @@ class AlbionAPIService {
             const apiUrl = `${this.baseURL}/guilds/${guildId}`;
             const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
 
-            console.log(`Fetching guild info: ${guildId}`);
+//             console.log(`Fetching guild info: ${guildId}`);
 
             const response = await fetch(proxyUrl);
 
@@ -207,7 +207,7 @@ class AlbionAPIService {
             const apiUrl = `${this.baseURL}/events?limit=${limit}&offset=${offset}&guildId=${guildId}`;
             const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
 
-            console.log(`Fetching guild events: limit=${limit}, offset=${offset}`);
+//             console.log(`Fetching guild events: limit=${limit}, offset=${offset}`);
 
             const response = await fetch(proxyUrl);
 
@@ -236,7 +236,7 @@ class AlbionAPIService {
             const apiUrl = `${this.baseURL}/guilds/${guildId}/top?range=${range}&limit=${limit}&offset=${offset}&region=Total`;
             const proxyUrl = this.proxyURL + encodeURIComponent(apiUrl);
 
-            console.log(`Fetching guild top kills: range=${range}, limit=${limit}`);
+//             console.log(`Fetching guild top kills: range=${range}, limit=${limit}`);
 
             const response = await fetch(proxyUrl);
 
@@ -267,13 +267,13 @@ class AlbionAPIService {
             return [];
         }
 
-        console.log('🔍 Filtering kills for participants:', participantNames, includeAll ? '(INITIAL LOAD - ALL KILLS)' : '(new kills only)');
-        console.log(`   Looking for ${participantNames.length} participants in ${events.length} events`);
+//         console.log('🔍 Filtering kills for participants:', participantNames, includeAll ? '(INITIAL LOAD - ALL KILLS)' : '(new kills only)');
+//         console.log(`   Looking for ${participantNames.length} participants in ${events.length} events`);
         if (guildName) {
-            console.log(`   Also filtering by guild name: "${guildName}"`);
+//             console.log(`   Also filtering by guild name: "${guildName}"`);
         }
         if (activityStartTime) {
-            console.log(`   Also filtering by activity start time: ${activityStartTime}`);
+//             console.log(`   Also filtering by activity start time: ${activityStartTime}`);
         }
 
         let skippedByEventId = 0;
@@ -343,24 +343,24 @@ class AlbionAPIService {
             if (shouldInclude) {
                 included++;
                 const guildMatchStr = guildName ? `, Guild match: ${guildMatch}` : '';
-                console.log(`  ✅ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (Killer in activity: ${killerIsParticipant}, Participant in activity: ${hasActivityParticipant}${guildMatchStr})`);
+//                 console.log(`  ✅ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (Killer in activity: ${killerIsParticipant}, Participant in activity: ${hasActivityParticipant}${guildMatchStr})`);
             } else {
                 skippedNoParticipation++;
                 const reason = guildName && !guildMatch ? 'Wrong guild' : 'No activity participation';
-                console.log(`  ❌ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (${reason})`);
+//                 console.log(`  ❌ Event ${event.EventId}: ${event.Killer?.Name} [${killerGuild}] → ${event.Victim?.Name} (${reason})`);
             }
 
             return shouldInclude;
         });
 
-        console.log(`📊 Filter results: ${included} included, ${skippedByEventId} skipped (old EventId), ${skippedNoParticipation} skipped (no participation)${guildName ? `, ${skippedWrongGuild} skipped (wrong guild)` : ''}${activityStartTime ? `, ${skippedBeforeActivity} skipped (before activity)` : ''}`);
+//         console.log(`📊 Filter results: ${included} included, ${skippedByEventId} skipped (old EventId), ${skippedNoParticipation} skipped (no participation)${guildName ? `, ${skippedWrongGuild} skipped (wrong guild)` : ''}${activityStartTime ? `, ${skippedBeforeActivity} skipped (before activity)` : ''}`);
 
         if (Object.keys(guildKillsFound).length > 0) {
-            console.log('📊 Guilds found in events:');
+//             console.log('📊 Guilds found in events:');
             Object.entries(guildKillsFound)
                 .sort((a, b) => b[1] - a[1])
                 .forEach(([guild, count]) => {
-                    console.log(`   - ${guild}: ${count} kills`);
+//                     console.log(`   - ${guild}: ${count} kills`);
                 });
         }
 
@@ -419,10 +419,10 @@ class AlbionAPIService {
         const allMemberNames = allGuildMembers.map(m => m.name);
         const activityStartDate = activityStartTime ? new Date(activityStartTime) : null;
 
-        console.log('🔍 Filtering OTHER guild kills (excluding activity participants)...');
-        console.log(`   Guild members: ${allMemberNames.length}, Activity participants: ${activityParticipantNames.length}`);
+//         console.log('🔍 Filtering OTHER guild kills (excluding activity participants)...');
+//         console.log(`   Guild members: ${allMemberNames.length}, Activity participants: ${activityParticipantNames.length}`);
         if (activityStartTime) {
-            console.log(`   Activity start time: ${activityStartTime}`);
+//             console.log(`   Activity start time: ${activityStartTime}`);
         }
 
         let included = 0;
@@ -479,7 +479,7 @@ class AlbionAPIService {
             return true;
         });
 
-        console.log(`📊 Other kills filter results: ${included} included, ${skippedNotGuild} skipped (not guild), ${skippedInActivity} skipped (in activity), ${skippedDuringActivity} skipped (during activity time)`);
+//         console.log(`📊 Other kills filter results: ${included} included, ${skippedNotGuild} skipped (not guild), ${skippedInActivity} skipped (in activity), ${skippedDuringActivity} skipped (during activity time)`);
 
         return filtered;
     }

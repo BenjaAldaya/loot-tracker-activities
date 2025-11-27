@@ -61,7 +61,7 @@ class AlbionPriceService {
             }
 
             try {
-                console.log(`Fetching prices for ${chunk.length} items in ${city}`);
+//                 console.log(`Fetching prices for ${chunk.length} items in ${city}`);
                 const response = await fetch(url, {
                     headers: {
                         'Accept-Encoding': 'gzip' // Request compression to save bandwidth

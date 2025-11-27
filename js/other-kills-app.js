@@ -17,7 +17,7 @@ class OtherKillsApp {
     }
 
     async init() {
-        console.log('Initializing Other Kills App...');
+//         console.log('Initializing Other Kills App...');
 
         // Start UTC clock
         this.startUTCClock();
@@ -45,7 +45,7 @@ class OtherKillsApp {
         // Start polling
         this.startPolling();
 
-        console.log('Other Kills App initialized');
+//         console.log('Other Kills App initialized');
     }
 
     startUTCClock() {
@@ -71,7 +71,7 @@ class OtherKillsApp {
         this.isLoading = true;
 
         try {
-            console.log(`Loading other guild kills (offset: ${this.offset})...`);
+//             console.log(`Loading other guild kills (offset: ${this.offset})...`);
 
             // Get guild events
             const guildEvents = await this.apiService.fetchGuildEvents(
@@ -80,7 +80,7 @@ class OtherKillsApp {
                 this.offset
             );
 
-            console.log(`Received ${guildEvents.length} guild events`);
+//             console.log(`Received ${guildEvents.length} guild events`);
 
             // Get active participant names and activity start time
             const activeParticipantNames = this.currentActivity
@@ -98,7 +98,7 @@ class OtherKillsApp {
                 activityStartTime
             );
 
-            console.log(`Filtered to ${otherKills.length} other guild kills`);
+//             console.log(`Filtered to ${otherKills.length} other guild kills`);
 
             // Process kills
             const processedKills = otherKills.map(killEvent =>
@@ -282,13 +282,13 @@ class OtherKillsApp {
     startPolling() {
         // Poll every 3 minutes - users don't need real-time updates for historical guild kills
         this.pollInterval = setInterval(async () => {
-            console.log('Polling for new guild kills...');
+//             console.log('Polling for new guild kills...');
             this.offset = 0;
             this.hasMore = true;
             await this.loadOtherGuildKills();
         }, 180000); // 3 minutes (180 seconds)
 
-        console.log('✅ Polling started: checking for new guild kills every 3 minutes');
+//         console.log('✅ Polling started: checking for new guild kills every 3 minutes');
     }
 
     stopPolling() {
